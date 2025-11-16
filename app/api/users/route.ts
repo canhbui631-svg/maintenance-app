@@ -5,22 +5,8 @@ import bcrypt from "bcryptjs";
 
 const ROLES = ["admin", "team_lead", "technician", "guest"] as const;
 
-function requireAdmin(req: NextRequest) {
-  const headerSecret = req.headers.get("x-admin-secret");
-  if (!headerSecret || headerSecret !== process.env.ADMIN_SECRET) {
-    return NextResponse.json(
-      { ok: false, message: "Unauthorized: admin only" },
-      { status: 401 }
-    );
-  }
-  return null;
-}
-
 // GET /api/users
 export async function GET(req: NextRequest) {
-  const unauthorized = requireAdmin(req);
-  if (unauthorized) return unauthorized;
-
   const users = await prisma.user.findMany({
     orderBy: { id: "asc" },
     include: {
@@ -47,11 +33,7 @@ export async function GET(req: NextRequest) {
 }
 
 // POST /api/users
-// body JSON: { name, username, password, role, areaIds: number[] }
 export async function POST(req: NextRequest) {
-  const unauthorized = requireAdmin(req);
-  if (unauthorized) return unauthorized;
-
   const { name, username, password, role, areaIds } = await req.json();
 
   if (!name || !username || !password || !role) {
@@ -69,7 +51,6 @@ export async function POST(req: NextRequest) {
   }
 
   const existing = await prisma.user.findUnique({ where: { username } });
-
   if (existing) {
     return NextResponse.json(
       { ok: false, message: "Username already exists" },
