@@ -1,202 +1,199 @@
-// app/accounts/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-type AccountRole = "admin" | "staff";
+type Role = "admin" | "team_lead" | "technician" | "guest";
 
-type Account = {
+interface User {
   id: number;
+  name: string;
   username: string;
-  fullName: string;
-  role: AccountRole;
-  active: boolean;
-};
-
-const initialAccounts: Account[] = [
-  { id: 1, username: "admin", fullName: "Quản trị hệ thống", role: "admin", active: true },
-  { id: 2, username: "nv.longhoa", fullName: "Nhân viên Long Hoa", role: "staff", active: true },
-  { id: 3, username: "nv.hoathanh", fullName: "Nhân viên Hoà Thành", role: "staff", active: false },
-];
+  role: Role;
+  createdAt: string;
+  areas: { id: number; name: string }[];
+}
 
 export default function AccountsPage() {
-  const [accounts, setAccounts] = useState<Account[]>(initialAccounts);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState<Omit<Account, "id" | "active">>({
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+  const [form, setForm] = useState({
+    name: "",
     username: "",
-    fullName: "",
-    role: "staff",
+    password: "",
+    role: "technician" as Role,
+    areaIds: "",
   });
 
-  const isEditing = editingId !== null;
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.username.trim()) return;
-
-    if (isEditing) {
-      setAccounts((prev) =>
-        prev.map((acc) =>
-          acc.id === editingId ? { ...acc, ...form } : acc
-        )
-      );
-      setEditingId(null);
-    } else {
-      const newAccount: Account = {
-        id: accounts.length ? Math.max(...accounts.map((a) => a.id)) + 1 : 1,
-        username: form.username,
-        fullName: form.fullName,
-        role: form.role,
-        active: true,
-      };
-      setAccounts((prev) => [...prev, newAccount]);
+  // Lấy danh sách user
+  const loadUsers = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/users");
+      const data = await res.json();
+      if (data.ok) {
+        setUsers(data.users);
+      } else {
+        setMessage(data.message || "Không tải được danh sách người dùng");
+      }
+    } catch (err: any) {
+      setMessage(err.message);
     }
-
-    setForm({ username: "", fullName: "", role: "staff" });
+    setLoading(false);
   };
 
-  const handleEdit = (acc: Account) => {
-    setEditingId(acc.id);
-    setForm({
-      username: acc.username,
-      fullName: acc.fullName,
-      role: acc.role,
-    });
-  };
+  useEffect(() => {
+    loadUsers();
+  }, []);
 
-  const handleToggleActive = (id: number) => {
-    setAccounts((prev) =>
-      prev.map((acc) =>
-        acc.id === id ? { ...acc, active: !acc.active } : acc
-      )
-    );
-  };
+  // Submit tạo user
+  const handleCreate = async (e: any) => {
+    e.preventDefault();
+    setMessage("");
 
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    setForm({ username: "", fullName: "", role: "staff" });
+    try {
+      const areaIds =
+        form.areaIds.trim().length > 0
+          ? form.areaIds
+              .split(",")
+              .map((v) => parseInt(v.trim(), 10))
+              .filter((n) => !isNaN(n))
+          : [];
+
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          username: form.username,
+          password: form.password,
+          role: form.role,
+          areaIds,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!data.ok) {
+        setMessage(data.message || "Tạo người dùng thất bại");
+        return;
+      }
+
+      setMessage("Tạo tài khoản thành công!");
+      setForm({
+        name: "",
+        username: "",
+        password: "",
+        role: "technician",
+        areaIds: "",
+      });
+
+      loadUsers();
+    } catch (err: any) {
+      setMessage(err.message);
+    }
   };
 
   return (
     <div className="card">
-      <h1 className="page-title">Quản lý tài khoản đăng nhập</h1>
-      <p className="page-desc">
-        Chỉ admin mới được tạo tài khoản, phân quyền nhân viên bảo trì. Sau này
-        kết nối với API đăng nhập thực tế.
-      </p>
+      <h1 className="page-title">Quản lý tài khoản</h1>
+      <p className="page-desc">Tạo tài khoản nhân viên, đội trưởng, admin và phân địa bàn.</p>
 
-      <form onSubmit={handleSubmit} className="form-grid form-grid-2">
+      {/* Form tạo user */}
+      <form onSubmit={handleCreate} className="form-grid" style={{ marginBottom: 24 }}>
         <div>
-          <label className="label">Tên đăng nhập</label>
+          <div className="label">Tên hiển thị</div>
+          <input
+            className="input"
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+          />
+        </div>
+
+        <div>
+          <div className="label">Tên đăng nhập</div>
           <input
             className="input"
             value={form.username}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, username: e.target.value }))
-            }
-            placeholder="VD: nv.longhoa"
+            onChange={(e) => setForm({ ...form, username: e.target.value })}
           />
         </div>
+
         <div>
-          <label className="label">Họ tên</label>
+          <div className="label">Mật khẩu</div>
           <input
             className="input"
-            value={form.fullName}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, fullName: e.target.value }))
-            }
-            placeholder="VD: Nguyễn Văn A"
+            type="password"
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
           />
         </div>
+
         <div>
-          <label className="label">Vai trò</label>
+          <div className="label">Vai trò</div>
           <select
             className="select"
             value={form.role}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, role: e.target.value as AccountRole }))
-            }
+            onChange={(e) => setForm({ ...form, role: e.target.value as Role })}
           >
-            <option value="staff">Nhân viên bảo trì</option>
             <option value="admin">Admin</option>
+            <option value="team_lead">Đội trưởng</option>
+            <option value="technician">Nhân viên</option>
+            <option value="guest">Khách</option>
           </select>
         </div>
-        <div style={{ alignSelf: "flex-end" }}>
-          <button type="submit" className="btn-primary">
-            {isEditing ? "Lưu chỉnh sửa" : "Tạo tài khoản"}
-          </button>
-          {isEditing && (
-            <button
-              type="button"
-              className="btn-secondary"
-              style={{ marginLeft: 8 }}
-              onClick={handleCancelEdit}
-            >
-              Huỷ
-            </button>
-          )}
+
+        <div>
+          <div className="label">ID địa bàn (vd: 1,2)</div>
+          <input
+            className="input"
+            value={form.areaIds}
+            onChange={(e) => setForm({ ...form, areaIds: e.target.value })}
+          />
         </div>
+
+        <button className="btn-primary" type="submit">
+          Tạo tài khoản
+        </button>
       </form>
 
-      <div className="table-wrapper">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Tên đăng nhập</th>
-              <th>Họ tên</th>
-              <th>Vai trò</th>
-              <th>Trạng thái</th>
-              <th style={{ width: 140 }}>Thao tác</th>
-            </tr>
-          </thead>
-          <tbody>
-            {accounts.map((acc) => (
-              <tr key={acc.id}>
-                <td>{acc.username}</td>
-                <td>{acc.fullName}</td>
-                <td>
-                  <span className="badge">
-                    {acc.role === "admin" ? "Admin" : "Nhân viên"}
-                  </span>
-                </td>
-                <td>
-                  <span className="badge">
-                    {acc.active ? "Đang hoạt động" : "Đã khoá"}
-                  </span>
-                </td>
-                <td>
-                  <div className="table-actions">
-                    <button
-                      type="button"
-                      className="btn-secondary btn-xs"
-                      onClick={() => handleEdit(acc)}
-                    >
-                      Sửa
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-secondary btn-xs"
-                      onClick={() => handleToggleActive(acc.id)}
-                    >
-                      {acc.active ? "Khoá" : "Mở khoá"}
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {accounts.length === 0 && (
-              <tr>
-                <td colSpan={5}>Chưa có tài khoản nào.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {message && <p>{message}</p>}
 
-      <p className="page-desc" style={{ marginTop: 8 }}>
-        Khi làm backend thật, chỉ cần map các thao tác này sang API tạo user /
-        update / khoá user.
-      </p>
+      {/* Bảng user */}
+      <h2 className="section-title">Danh sách tài khoản</h2>
+
+      {loading ? (
+        <p>Đang tải...</p>
+      ) : (
+        <div className="table-wrapper">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Tên</th>
+                <th>Username</th>
+                <th>Vai trò</th>
+                <th>Địa bàn</th>
+                <th>Ngày tạo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((u) => (
+                <tr key={u.id}>
+                  <td>{u.id}</td>
+                  <td>{u.name}</td>
+                  <td>{u.username}</td>
+                  <td>
+                    <span className="badge">{u.role}</span>
+                  </td>
+                  <td>{u.areas.map((a) => a.name).join(", ")}</td>
+                  <td>{new Date(u.createdAt).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
