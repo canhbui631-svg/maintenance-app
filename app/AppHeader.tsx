@@ -4,29 +4,29 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { User, Role, hasPermission } from "./auth/permissions";
+import { User, hasPermission } from "./auth/permissions";
 
 export function AppHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
 
+  // Đọc user đã login từ storage (do trang /login lưu vào)
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const raw = window.localStorage.getItem("maintenance-user");
+    // Ưu tiên sessionStorage (login không ghi nhớ), sau đó localStorage (ghi nhớ)
+    const rawSession = window.sessionStorage.getItem("maintenance-user");
+    const rawLocal = window.localStorage.getItem("maintenance-user");
+    const raw = rawSession ?? rawLocal;
+
     if (raw) {
-      setUser(JSON.parse(raw));
-    } else {
-      // DEMO: tạm tạo 1 user đội trưởng để test
-      const demoUser: User = {
-        id: 1,
-        name: "Đội trưởng Long Hoa",
-        username: "leader.longhoa",
-        role: "leader",
-      };
-      window.localStorage.setItem("maintenance-user", JSON.stringify(demoUser));
-      setUser(demoUser);
+      try {
+        setUser(JSON.parse(raw));
+      } catch {
+        window.sessionStorage.removeItem("maintenance-user");
+        window.localStorage.removeItem("maintenance-user");
+      }
     }
   }, []);
 
@@ -36,6 +36,7 @@ export function AppHeader() {
   const handleLogout = () => {
     if (typeof window !== "undefined") {
       window.localStorage.removeItem("maintenance-user");
+      window.sessionStorage.removeItem("maintenance-user");
     }
     setUser(null);
     router.push("/login");
@@ -49,7 +50,7 @@ export function AppHeader() {
         <div>
           <div className="app-title">PHẦN MỀM BẢO TRÌ LQV</div>
           <div className="app-subtitle">
-            Quản lý bảo trì chiếu sáng & nhân viên hiện trường
+            Quản lý bảo trì chiếu sáng &amp; nhân viên hiện trường
           </div>
         </div>
 

@@ -1,0 +1,2 @@
+C:\Users\ducca\maintenance-app>npm run dev
+C:\Users\ducca\maintenance-app>npx prisma migrate dev --name init
