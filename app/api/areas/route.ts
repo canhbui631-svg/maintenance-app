@@ -9,7 +9,7 @@ export async function GET() {
     select: {
       id: true,
       name: true,
-     // roads: true,
+      np roads: true,
       hamlets: true,
     },
   });
