@@ -24,7 +24,7 @@ model Area {
   id        Int           @id @default(autoincrement())
   name      String
 
-  // 💡 MỚI THÊM:
+  // 💡 MỚI THÊM: ok
   roads     String?       // các tuyến đường chính
   hamlets   String?       // ấp / khu phố
 
