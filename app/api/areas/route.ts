@@ -9,8 +9,8 @@ export async function GET() {
     select: {
       id: true,
       name: true,
-      np roads: true,
-      hamlets: true,
+     //np roads: true,
+     // hamlets: true,
     },
   });
 
