@@ -17,12 +17,17 @@ model User {
   createdAt DateTime @default(now())
 
   createdTickets  Ticket[] @relation("CreatedTickets")
-  assignedTickets Ticket[] @relation("AssignedTickets")  
+  assignedTickets Ticket[] @relation("AssignedTickets")
 }
 
 model Area {
   id        Int           @id @default(autoincrement())
   name      String
+
+  // 💡 MỚI THÊM:
+  roads     String?       // các tuyến đường chính
+  hamlets   String?       // ấp / khu phố
+
   users     AreaOnUser[]
   routes    Route[]
   createdAt DateTime      @default(now())
@@ -65,4 +70,12 @@ model Ticket {
   status      String   // "new" | "assigned" | "in_progress" | "done" | "approved"
   description String
   createdAt   DateTime @default(now())
+}
+
+model Material {
+  id        Int      @id @default(autoincrement())
+  code      String?  // mã vật tư (có thể để trống)
+  name      String   // tên vật tư
+  unit      String   // đơn vị: cái, bộ, mét...
+  createdAt DateTime @default(now())
 }

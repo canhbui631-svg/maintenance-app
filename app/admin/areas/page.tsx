@@ -1,195 +1,158 @@
 // app/admin/areas/page.tsx
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";   // ⭐ THÊM CHỖ NÀY
+import { useEffect, useState } from "react";
 
 type Area = {
   id: number;
-  name: string; 
-  routes: string; 
-  hamlets: string; 
+  name: string;
+  roads: string;
+  hamlets: string;
 };
 
-const initialAreas: Area[] = [
-  {
-    id: 1,
-    name: "Xã Long Hoa",
-    routes: "DT785, Đường ven sông",
-    hamlets: "Ấp Long Chí, Ấp Long Khánh",
-  },
-  {
-    id: 2,
-    name: "Thị xã Hoà Thành",
-    routes: "QL22B, Đường CMT8",
-    hamlets: "Khu phố 1, Khu phố 2",
-  },
-];
+export default function AdminAreasPage() {
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [name, setName] = useState("");
+  const [roads, setRoads] = useState("");
+  const [hamlets, setHamlets] = useState("");
+  const [loading, setLoading] = useState(false);
 
-export default function AreasPage() {
-  const [areas, setAreas] = useState<Area[]>(initialAreas);
-  const [editingId, setEditingId] = useState<number | null>(null);
-  const [form, setForm] = useState<Omit<Area, "id">>({
-    name: "",
-    routes: "",
-    hamlets: "",
-  });
+  const loadAreas = async () => {
+    const res = await fetch("/api/areas");
+    const data = await res.json();
+    if (data.ok) {
+      setAreas(data.areas);
+    }
+  };
 
-  const isEditing = editingId !== null;
+  useEffect(() => {
+    loadAreas();
+  }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.name.trim()) return;
+    if (!name.trim()) return;
 
-    if (isEditing) {
-      setAreas((prev) =>
-        prev.map((a) => (a.id === editingId ? { ...a, ...form } : a))
-      );
-      setEditingId(null);
-    } else {
-      const newArea: Area = {
-        id: areas.length ? Math.max(...areas.map((a) => a.id)) + 1 : 1,
-        ...form,
-      };
-      setAreas((prev) => [...prev, newArea]);
-    }
-
-    setForm({ name: "", routes: "", hamlets: "" });
-  };
-
-  const handleEdit = (area: Area) => {
-    setEditingId(area.id);
-    setForm({
-      name: area.name,
-      routes: area.routes,
-      hamlets: area.hamlets,
+    setLoading(true);
+    await fetch("/api/areas", {
+      method: "POST",
+      body: JSON.stringify({ name, roads, hamlets }),
     });
+
+    setName("");
+    setRoads("");
+    setHamlets("");
+    setLoading(false);
+    loadAreas();
   };
 
-  const handleDelete = (id: number) => {
-    if (!confirm("Xoá địa bàn này?")) return;
-    setAreas((prev) => prev.filter((a) => a.id !== id));
-    if (editingId === id) {
-      setEditingId(null);
-      setForm({ name: "", routes: "", hamlets: "" });
+  const handleDelete = async (id: number) => {
+    if (!confirm("Bạn chắc chắn muốn xoá khu vực này?")) return;
+
+    const res = await fetch(`/api/areas/${id}`, {
+      method: "DELETE",
+    });
+
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok || !data?.ok) {
+      alert("Xoá thất bại: " + (data?.message ?? "Lỗi không xác định"));
+      return;
     }
-  };
 
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    setForm({ name: "", routes: "", hamlets: "" });
+    // Xoá thành công -> load lại danh sách
+    loadAreas();
   };
 
   return (
     <div className="card">
-      <h1 className="page-title">Quản lý địa bàn</h1>
+      <h1 className="page-title">Quản lý khu vực</h1>
       <p className="page-desc">
-        Địa bàn gồm: xã / phường, các tuyến đường chính và các ấp / khu phố.
-        Sau này khi nhân viên tạo ticket bảo trì sẽ chọn từ danh sách này.
+        Khu vực gồm: xã / phường, các tuyến đường chính và các ấp / khu phố.
+        Sau này khi nhân viên tạo ticket bảo trì sẽ chọn từ danh sách này, tránh
+        ghi sai tên.
       </p>
 
-      <form onSubmit={handleSubmit} className="form-grid form-grid-2">
-        <div>
-          <label className="label">Tên địa bàn (xã/phường)</label>
-          <input
-            className="input"
-            value={form.name}
-            onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-            placeholder="VD: Xã Long Hoa"
-          />
-        </div>
+      {/* Form thêm khu vực */}
+      <form
+        className="space-y-2"
+        style={{ marginBottom: 16 }}
+        onSubmit={handleAdd}
+      >
+        <label className="label">Tên khu vực (xã / phường)</label>
+        <input
+          className="input"
+          placeholder="VD: Xã Long Hoa, Phường 1..."
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
 
-        <div>
-          <label className="label">Tuyến đường</label>
-          <input
-            className="input"
-            value={form.routes}
-            onChange={(e) => setForm((f) => ({ ...f, routes: e.target.value }))}
-            placeholder="VD: DT785, QL22B,…"
-          />
-        </div>
+        <label className="label">Tuyến đường chính</label>
+        <input
+          className="input"
+          placeholder="VD: DT785, QL22B, Đường ven sông..."
+          value={roads}
+          onChange={(e) => setRoads(e.target.value)}
+        />
 
-        <div>
-          <label className="label">Ấp / khu phố</label>
-          <input
-            className="input"
-            value={form.hamlets}
-            onChange={(e) => setForm((f) => ({ ...f, hamlets: e.target.value }))}
-            placeholder="VD: Ấp Long Chí, Ấp Long Khánh,…"
-          />
-        </div>
+        <label className="label">Ấp / khu phố</label>
+        <input
+          className="input"
+          placeholder="VD: Ấp Long Chí, Ấp Long Khánh, Khu phố 1..."
+          value={hamlets}
+          onChange={(e) => setHamlets(e.target.value)}
+        />
 
-        <div style={{ alignSelf: "flex-end" }}>
-          <button type="submit" className="btn-primary">
-            {isEditing ? "Lưu chỉnh sửa" : "Thêm địa bàn"}
-          </button>
-          {isEditing && (
-            <button
-              type="button"
-              className="btn-secondary"
-              style={{ marginLeft: 8 }}
-              onClick={handleCancelEdit}
-            >
-              Huỷ
-            </button>
-          )}
-        </div>
+        <button
+          type="submit"
+          className="btn-primary w-full"
+          disabled={loading}
+        >
+          {loading ? "Đang thêm..." : "Thêm khu vực"}
+        </button>
       </form>
 
+      {/* Bảng danh sách khu vực */}
       <div className="table-wrapper">
         <table className="table">
           <thead>
             <tr>
-              <th>Địa bàn</th>
+              <th>Khu vực</th>
               <th>Tuyến đường</th>
               <th>Ấp / khu phố</th>
-              <th style={{ width: 120 }}>Thao tác</th>
+              <th>Thao tác</th>
             </tr>
           </thead>
+
           <tbody>
+            {areas.length === 0 && (
+              <tr>
+                <td colSpan={4} style={{ textAlign: "center", padding: 12 }}>
+                  Chưa có khu vực nào. Hãy thêm khu vực mới phía trên.
+                </td>
+              </tr>
+            )}
+
             {areas.map((area) => (
               <tr key={area.id}>
-                {/* ⭐ ĐÃ CHỈNH SỬA CHỖ NÀY */}
-                <td>
-                  <Link href={`/admin/areas/${area.id}`} className="table-link">
-                    {area.name}
-                  </Link>
-                </td>
-
-                <td>{area.routes}</td>
+                <td>{area.name}</td>
+                <td>{area.roads}</td>
                 <td>{area.hamlets}</td>
                 <td>
-                  <div className="table-actions">
-                    <button
-                      type="button"
-                      className="btn-secondary btn-xs"
-                      onClick={() => handleEdit(area)}
-                    >
-                      Sửa
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-secondary btn-xs"
-                      onClick={() => handleDelete(area.id)}
-                    >
-                      Xoá
-                    </button>
-                  </div>
+                  {/* Nếu sau này làm chức năng sửa thì thêm nút ở đây */}
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => handleDelete(area.id)}
+                  >
+                    Xóa
+                  </button>
                 </td>
               </tr>
             ))}
-            {areas.length === 0 && (
-              <tr>
-                <td colSpan={4}>Chưa có địa bàn nào.</td>
-              </tr>
-            )}
           </tbody>
         </table>
       </div>
-
-      <p className="page-desc" style={{ marginTop: 8 }}>
-        Nhấp vào tên địa bàn để xem thống kê chi tiết của khu vực.
-      </p>
     </div>
   );
 }

@@ -1,12 +1,20 @@
 // lib/prisma.ts
 import { PrismaClient } from "@prisma/client";
 
-const globalForPrisma = global as unknown as { prisma?: PrismaClient };
+const globalForPrisma = globalThis as unknown as {
+  prisma?: PrismaClient;
+};
 
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
-    log: ["error", "warn"], // muốn xem nhiều log hơn thì thêm "query"
+    // log: ["query", "error", "warn"], // cần thì mở
   });
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+// tránh tạo nhiều instance khi hot reload trong dev
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma;
+}
+
+// 👇 quan trọng: default export
+export default prisma;

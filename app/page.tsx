@@ -1,134 +1,206 @@
 // app/page.tsx
-import Link from "next/link";
+import { prisma } from "@/lib/prisma";
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const now = new Date();
+
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const startOfWeek = new Date(now);
+  startOfWeek.setHours(0, 0, 0, 0);
+  startOfWeek.setDate(startOfWeek.getDate() - 6); // 7 ngày gần nhất
+
+  // ---- Các số tổng quan ----
+  const [
+    ticketsToday,
+    ticketsTodayOpen,
+    ticketsWeek,
+    openTicketsDistinctPolesRows,
+    staffOnsite,
+  ] = await Promise.all([
+    prisma.ticket.count({
+      where: { createdAt: { gte: startOfToday } },
+    }),
+    prisma.ticket.count({
+      where: {
+        createdAt: { gte: startOfToday },
+        status: { notIn: ["done", "approved"] },
+      },
+    }),
+    prisma.ticket.count({
+      where: { createdAt: { gte: startOfWeek } },
+    }),
+    prisma.ticket.findMany({
+      where: {
+        status: { notIn: ["done", "approved"] },
+      },
+      distinct: ["poleId"],
+      select: { poleId: true },
+    }),
+    prisma.ticket.count({
+      where: { status: { notIn: ["done", "approved"] } },
+    }),
+  ]);
+
+  const openTicketsDistinctPoles = openTicketsDistinctPolesRows.length;
+
+  // ---- Thống kê theo khu vực ----
+  const areas = await prisma.area.findMany({
+    include: {
+      routes: {
+        include: {
+          poles: {
+            select: { id: true },
+          },
+        },
+      },
+    },
+    orderBy: { id: "asc" },
+  });
+
+  const areaStats = await Promise.all(
+    areas.map(async (area) => {
+      const poleIds = area.routes.flatMap((r) => r.poles.map((p) => p.id));
+
+      if (poleIds.length === 0) {
+        return {
+          id: area.id,
+          name: area.name,
+          today: 0,
+          open: 0,
+        };
+      }
+
+      const [todayCount, openCount] = await Promise.all([
+        prisma.ticket.count({
+          where: {
+            poleId: { in: poleIds },
+            createdAt: { gte: startOfToday },
+          },
+        }),
+        prisma.ticket.count({
+          where: {
+            poleId: { in: poleIds },
+            status: { notIn: ["done", "approved"] },
+          },
+        }),
+      ]);
+
+      return {
+        id: area.id,
+        name: area.name,
+        today: todayCount,
+        open: openCount,
+      };
+    })
+  );
+
   return (
     <div className="card">
       <h1 className="page-title">Dashboard</h1>
       <p className="page-desc">
-        Tổng quan nhanh về tình hình bảo trì, thống kê theo địa bàn, tuyến
-        đường và phân công nhân viên.
+        Tổng quan nhanh về tình hình bảo trì, thống kê theo khu vực, tuyến
+        đường và phân công nhân viên. Dữ liệu lấy trực tiếp từ hệ thống.
       </p>
 
-      {/* Hàng thống kê nhanh */}
+      {/* Stats tổng quan */}
       <div className="stats-grid">
-        <Link
-          href="/maintenance?range=today"
-          className="stat-card stat-card-link"
-        >
+        <div className="stat-card">
           <div className="stat-label">Sự cố hôm nay</div>
-          <div className="stat-value">12</div>
-          <div className="stat-sub">4 chưa xử lý</div>
-        </Link>
+          <div className="stat-value">{ticketsToday}</div>
+          <div className="stat-sub">{ticketsTodayOpen} chưa xử lý</div>
+        </div>
 
-        <Link
-          href="/maintenance?range=week"
-          className="stat-card stat-card-link"
-        >
-          <div className="stat-label">Sự cố trong tuần</div>
-          <div className="stat-value">57</div>
-          <div className="stat-sub">18 ở xã Long Hoa</div>
-        </Link>
+        <div className="stat-card">
+          <div className="stat-label">Sự cố 7 ngày gần nhất</div>
+          <div className="stat-value">{ticketsWeek}</div>
+          <div className="stat-sub">Tất cả khu vực</div>
+        </div>
 
-        <Link
-          href="/maintenance?status=processing"
-          className="stat-card stat-card-link"
-        >
-          <div className="stat-label">Tuyến đường có sự cố</div>
-          <div className="stat-value">23</div>
-          <div className="stat-sub">Ưu tiên tuyến chính</div>
-        </Link>
+        <div className="stat-card">
+          <div className="stat-label">Tuyến/trụ đang có sự cố</div>
+          <div className="stat-value">{openTicketsDistinctPoles}</div>
+          <div className="stat-sub">Đang mở ticket</div>
+        </div>
 
-        <Link
-          href="/maintenance?assignee=onsite"
-          className="stat-card stat-card-link"
-        >
-          <div className="stat-label">Nhân viên đang on-site</div>
-          <div className="stat-value">5</div>
-          <div className="stat-sub">2 ca đêm</div>
-        </Link>
+        <div className="stat-card">
+          <div className="stat-label">Nhân viên đang on-site*</div>
+          <div className="stat-value">{staffOnsite}</div>
+          <div className="stat-sub">
+            *tạm tính theo số ticket đang xử lý
+          </div>
+        </div>
       </div>
 
       <div className="dashboard-layout">
-        {/* Cột trái: menu chức năng chính */}
+        {/* Cột trái: menu chức năng */}
         <div>
           <h2 className="section-title">Chức năng chính</h2>
           <div className="grid-menu">
-            <Link href="/maintenance" className="menu-btn">
-              <span className="menu-btn-title">Nhập sự cố bảo trì</span>
-              <span className="menu-btn-desc">
-                Nhân viên hiện trường tạo ticket: xã, tuyến đường, trụ, vật tư…
-              </span>
-            </Link>
+            <a href="/maintenance" className="menu-btn">
+              <div className="menu-btn-title">Nhập sự cố bảo trì</div>
+              <div className="menu-btn-desc">
+                Nhân viên hiện trường tạo ticket: xã, tuyến đường, trụ, vật tư...
+              </div>
+            </a>
 
-            <Link href="/admin/areas" className="menu-btn">
-              <span className="menu-btn-title">Địa bàn (xã, ấp, tuyến)</span>
-              <span className="menu-btn-desc">
-                Quản lý danh sách địa bàn, tuyến đường, ấp. Tạo mới / chỉnh sửa.
-              </span>
-            </Link>
+            <a href="/admin/areas" className="menu-btn">
+              <div className="menu-btn-title">Khu vực (xã, ấp, tuyến)</div>
+              <div className="menu-btn-desc">
+                Quản lý danh sách khu vực, tuyến đường, áp/móc lưới chiếu sáng.
+              </div>
+            </a>
 
-            <Link href="/admin/materials" className="menu-btn">
-              <span className="menu-btn-title">Danh mục vật tư</span>
-              <span className="menu-btn-desc">
-                Danh sách bóng, kích, dây, kẹp… để chọn nhanh, tránh ghi sai.
-              </span>
-            </Link>
+            <a href="/admin/materials" className="menu-btn">
+              <div className="menu-btn-title">Danh mục vật tư</div>
+              <div className="menu-btn-desc">
+                Danh sách bóng, kích, dây, kẹp... để chọn nhanh khi tạo phiếu.
+              </div>
+            </a>
 
-            <Link href="/admin/accounts" className="menu-btn">
-              <span className="menu-btn-title">Quản lý tài khoản đăng nhập</span>
-              <span className="menu-btn-desc">
-                Chỉ admin/đội trưởng được tạo / khoá tài khoản nhân viên bảo trì.
-              </span>
-            </Link>
+            <a href="/admin/accounts" className="menu-btn">
+              <div className="menu-btn-title">Quản lý tài khoản đăng nhập</div>
+              <div className="menu-btn-desc">
+                Admin/đội trưởng tạo user, phân khu vực, khóa/mở tài khoản.
+              </div>
+            </a>
           </div>
         </div>
 
-        {/* Cột phải: tóm tắt theo địa bàn */}
+        {/* Cột phải: sự cố theo khu vực */}
         <div>
-          <h2 className="section-title">Sự cố theo địa bàn (demo)</h2>
-          <div className="table-wrapper">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Địa bàn</th>
-                  <th>Sự cố hôm nay</th>
-                  <th>Đang xử lý</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>
-                    <Link href="/admin/areas/1" className="table-link">
-                      Long Hoa
-                    </Link>
-                  </td>
-                  <td>5</td>
-                  <td>2</td>
-                </tr>
-                <tr>
-                  <td>
-                    <Link href="/admin/areas/2" className="table-link">
-                      Hoà Thành
-                    </Link>
-                  </td>
-                  <td>3</td>
-                  <td>1</td>
-                </tr>
-                <tr>
-                  <td>
-                    <Link href="/admin/areas/3" className="table-link">
-                      Gò Dầu
-                    </Link>
-                  </td>
-                  <td>2</td>
-                  <td>1</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <h2 className="section-title">Sự cố theo khu vực</h2>
+          {areaStats.length === 0 ? (
+            <p className="page-desc">
+              Chưa có khu vực nào trong hệ thống. Hãy vào mục{" "}
+              <strong>Khu vực</strong> để tạo trước.
+            </p>
+          ) : (
+            <div className="table-wrapper">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Khu vực</th>
+                    <th>Sự cố hôm nay</th>
+                    <th>Đang xử lý</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {areaStats.map((a) => (
+                    <tr key={a.id}>
+                      <td>{a.name}</td>
+                      <td>{a.today}</td>
+                      <td>{a.open}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           <p className="page-desc" style={{ marginTop: 8 }}>
-            Nhấp vào tên địa bàn để xem thống kê chi tiết của khu vực đó.
+            Nhấp vào mục <strong>Khu vực</strong> để quản lý chi tiết từng
+            tuyến đường, trụ đèn và kiểm tra ticket liên quan.
           </p>
         </div>
       </div>

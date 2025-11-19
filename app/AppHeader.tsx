@@ -76,7 +76,7 @@ export function AppHeader() {
             </Link>
           )}
 
-          {/* Địa bàn: admin + đội trưởng */}
+          {/* Khu vực: admin + đội trưởng */}
           {hasPermission(user, "manageAreas") && (
             <Link
               href="/admin/areas"
@@ -84,7 +84,7 @@ export function AppHeader() {
                 isActive("/admin/areas") ? "nav-link-active" : ""
               }`}
             >
-              Địa bàn
+              Khu vực
             </Link>
           )}
 

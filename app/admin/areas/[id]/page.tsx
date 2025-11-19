@@ -1,61 +1,102 @@
-// app/admin/areas/[id]/page.tsx
+"use client";
 
-type AreaDetailPageProps = {
-  params: { id: string };
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+
+type Area = {
+  id: number;
+  name: string;
+  roads: string;
+  hamlets: string;
 };
 
-// Demo dữ liệu địa bàn
-const areaMap: Record<
-  string,
-  { name: string; today: number; week: number; processing: number }
-> = {
-  "1": { name: "Long Hoa", today: 5, week: 20, processing: 2 },
-  "2": { name: "Hoà Thành", today: 3, week: 15, processing: 1 },
-  "3": { name: "Gò Dầu", today: 2, week: 10, processing: 1 },
-};
+export default function AreaDetailPage() {
+  const params = useParams();
+  const router = useRouter();
+  const id = Number(params.id);
 
-export default function AreaDetailPage({ params }: AreaDetailPageProps) {
-  const area = areaMap[params.id];
+  const [area, setArea] = useState<Area | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const loadArea = async () => {
+    const res = await fetch(`/api/areas/${id}`);
+    const data = await res.json();
+    if (data.ok) setArea(data.area);
+  };
+
+  useEffect(() => {
+    if (id) loadArea();
+  }, [id]);
+
+  const handleSave = async () => {
+    if (!area) return;
+    setSaving(true);
+    await fetch(`/api/areas/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({
+        name: area.name,
+        roads: area.roads,
+        hamlets: area.hamlets,
+      }),
+    });
+    setSaving(false);
+    router.back();
+  };
 
   if (!area) {
-    return (
-      <div className="card">
-        <h1 className="page-title">Địa bàn không tồn tại</h1>
-        <p className="page-desc">
-          Không tìm thấy thông tin địa bàn với mã: {params.id}
-        </p>
-      </div>
-    );
+    return <div className="p-6 text-sm text-gray-400">Đang tải…</div>;
   }
 
   return (
-    <div className="card">
-      <h1 className="page-title">Thống kê địa bàn: {area.name}</h1>
-      <p className="page-desc">
-        Số liệu demo. Sau này sẽ lấy dữ liệu thật từ ticket bảo trì.
-      </p>
+    <div className="px-8 py-6">
+      <h1 className="text-xl font-semibold mb-4">
+        Sửa địa bàn – {area.name}
+      </h1>
 
-      <div className="stats-grid">
-        <div className="stat-card">
-          <div className="stat-label">Sự cố hôm nay</div>
-          <div className="stat-value">{area.today}</div>
+      <div className="space-y-4 max-w-xl">
+        <div>
+          <label className="block text-sm mb-1">Tên địa bàn (xã / phường)</label>
+          <input
+            className="w-full bg-slate-800 rounded-lg px-3 py-2 text-sm outline-none border border-slate-700 focus:border-blue-500"
+            value={area.name}
+            onChange={(e) => setArea({ ...area, name: e.target.value })}
+          />
         </div>
-        <div className="stat-card">
-          <div className="stat-label">Sự cố trong tuần</div>
-          <div className="stat-value">{area.week}</div>
+
+        <div>
+          <label className="block text-sm mb-1">Tuyến đường</label>
+          <textarea
+            className="w-full bg-slate-800 rounded-lg px-3 py-2 text-sm outline-none border border-slate-700 focus:border-blue-500 min-h-[80px]"
+            value={area.roads}
+            onChange={(e) => setArea({ ...area, roads: e.target.value })}
+          />
         </div>
-        <div className="stat-card">
-          <div className="stat-label">Đang xử lý</div>
-          <div className="stat-value">{area.processing}</div>
+
+        <div>
+          <label className="block text-sm mb-1">Ấp / khu phố</label>
+          <textarea
+            className="w-full bg-slate-800 rounded-lg px-3 py-2 text-sm outline-none border border-slate-700 focus:border-blue-500 min-h-[80px]"
+            value={area.hamlets}
+            onChange={(e) => setArea({ ...area, hamlets: e.target.value })}
+          />
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={() => router.back()}
+            className="px-4 py-2 text-sm rounded-full bg-slate-700 hover:bg-slate-600"
+          >
+            Hủy
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-4 py-2 text-sm rounded-full bg-blue-600 hover:bg-blue-500 disabled:opacity-60"
+          >
+            {saving ? "Đang lưu…" : "Lưu thay đổi"}
+          </button>
         </div>
       </div>
-
-      <p className="page-desc" style={{ marginTop: 16 }}>
-        Bạn có thể bổ sung thêm:
-        <br />- Danh sách tuyến đường của địa bàn này
-        <br />- Danh sách sự cố chi tiết tại đây
-        <br />- Tổng vật tư đã sử dụng trong tuần/tháng
-      </p>
     </div>
   );
 }
